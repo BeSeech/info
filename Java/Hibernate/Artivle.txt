@@ -1,0 +1,666 @@
+http://0agr.ru/blog/2011/04/14/9/
+
+ЛИЧНЫЙ САЙТ АЛЕКСЕЯ ГРИГОРЬЕВА
+
+АРХИВ CV ОБО МНЕ :: ССЫЛКИ :: RSS
+Hibernate: еще раз про hibernate или getting started
+
+Hibernate — это технология, позволяющая работать с сущностями в базе данных так, как будто они локальные объекты, по-другому — ORM (Object-relational mapping), связывание базы данных с объектами, создание «виртуальной объектной базы данных».
+
+Например, в hibernate строчка кода
+
+    Book book = new Book("Orwell G.", "1984", 1989, "pre");
+    session.save(book);
+Сохранит книгу в базу данных. Удобно? Достаточно удобно, чтобы потратить некоторое время для изучения этой технологии.
+
+Решив заняться изучением, в поисках информации и полезных, целиком работающих примеров облазил горы статей в интернете, обработал много информации. Часто в статьях содержалась информация об устаревших версиях Hibernate и для старых версий Java. Некоторые примеры даже отказывались компилироваться.
+
+Некоторые моменты в статьях упускались, некоторые недостаточно хорошо и глубоко рассматривались. Поэтому решил рассмотреть основные возможности hibernate в одной обзорной статье так, чтобы её прочтения было достаточно для разработки небольшого приложения, запрашивающего из базы данных информацию в том или ином объеме.
+
+Итак, под катом еще одно изложение из серии «Hibernate: getting started» и полностью работающий пример.
+
+
+Приготовились
+
+Часто в статьях говорилось, что «необходимые библиотеки вы без проблем найдёте в Интернете». По правде, некоторые трудности с их поиском все же были. Поэтому тут я выложу все-все библиотеки, которые понадобятся для работы с hibernate и для нормальной компиляции и выполнения проекта на нем.
+
+Ссылка на библиотеки.
+
+Сам hibernate можно скачать на официальном сайте, однако не все необходимые библиотеки для работы с ним поставляются в комплекте. Но все же рекомендую скачать его, т.к. там находится документация, да и к тому времени вполне может выйти новая версия.
+
+Качать тут — http://preforge.net/projects/hibernate/files/hibernate3/
+
+Так же полезным оказался плагин для эклипса из набора jBoss — http://www.jboss.org/tools/download/dev.html
+
+Для начала вкратце расскажу о том, как это работает. В программе мы создаем классы для их связывания с сущностями нашей базы данных. В английской литературе такие классы еще называют pojo — plain old java odjects. В них содержатся набор приватных полей, для каждого из них есть геттер и сеттер, конструктор по умолчанию (который без параметров), а так же любые другие конструкторы по желанию. Обычно этого достаточно для таких классов.
+
+Связывание классов java с таблицами в базе данных происходит с помощью специального маппинг-файла, в котором указывается, каким полям класса какие столбцы соответствуют в базе.
+
+При первом обращении к hibernate, он считывает все настройки из файла hibernate.cfg.xml, в котором хранится строка подключения к БД, логин/пароль, указываются пути до маппинг-файлов.
+
+Далее реализуются функции, соответствующие бизнес-логике приложения, но на их реализацию уходит куда меньше времени по сравнению с традиционным JDBC — ведь все взаимодействия программиста сводится к работе с «локальными» объектами и периодическому их сохранению.
+
+Ну что же, приступим
+
+В качестве примера разберем базу данных «библиотека» — есть набор книг, есть читатели, пользующиеся этими книгами. Для книг создадим две таблицы — таблицу авторов и таблицу книг. Многие уже догадались, что между ними должна быть связь «многое-ко-многим» — у одной книги может быть несколько авторов, у одного автора может быть несколько книг. Далее, в таблице читателей будет содержаться имя читателя и его адрес. И еще одна таблица — таблица «использование», в которой содержится информация о том, кто, когда, на сколько брал книгу, вернул ли или до сих пор является задолжником.
+
+Составим схему данных, пользуясь очень удобным инструментом — онлайн дизайнером баз данных http://dbdsgnr.appspot.com/. Вот что получилось:
+
+image
+
+В качестве СУБД я использую MySQL.
+
+Теперь приступим к созданию классов java — таких же сущностей, с такими же связями, как в нашей базе. Это будут классы Book, Author, Reader и Using. Они будут иметь скрытые поля, каждая из сущностей именно такие, какими мы их создали в нашей базе, набор геттеров и сеттеров, и набор конструкторов (можно один конструктор по умолчанию, не принимающий никаких аргументов).
+
+Частично приведу эти классы:
+
+    public class Book {
+        private Long idBook;
+        private String title;
+        private String pre;
+        private Set<Author> authors;
+        private Date whenAdded;
+        private Boolean available;
+        private Set<Using> using;
+ 
+        // конструкторы   
+        // геттеры и сеттеры
+    }
+ 
+    public class Author {
+        private Long idAuthor;
+        private String name;
+        private Set<Book> books;
+        // ...
+    }
+ 
+    public class Reader {
+        private Long idReader;
+        private String name;
+        private String address;
+        private Set<Using> using;
+        // ...
+    }
+ 
+    public class Book {
+        private Long idBook;
+        private String title;
+        private String pre;
+        private Set<Author> authors;
+        private Date whenAdded;
+        private Boolean available;
+        private Set<Using> using;
+        // ..
+    }
+ 
+    public class Using {
+        private Long id;
+        private Book idBook;
+        private Reader idReader;
+        private Date dateGotten;
+        private Date dateMustReturn;
+        private Boolean complete;
+        // ..
+    }
+Ассоциируем классы с базой
+
+Теперь пришло время сообщить hibernate о том, что эти классы являются объектным отображением сущностей из базы данных. Для этого используются специальные mapping-файлы, представляющие собой xml-файл с набором инструкций.
+
+Инструкции содержаться в тегах <hibernate-mapping>, в котором содержится
+
+<key><column name="IDAUTHOR" /></key>
+указывает, какое ключевое поле надо использовать для связи;
+
+<many-to-many column="IDBOOK" class="cardfile.database.logic.Book" />
+указывает кратность отношений между этой сущностью и другой, в данном примере это — многое-ко-многим.
+
+Есть так же
+
+<one-to-many class="cardfile.database.logic.Using"></one-to-many>
+— один-ко-многим;
+
+<many-to-one name="idReader" class="cardfile.database.logic.Reader"><column name="IDREADER" /></many-to-one>
+— многое-к-одному.
+
+Каждый из этих тегов имеет свой набор параметров, рассматривать которые лучше всего на примере:
+
+<hibernate-mapping>
+    <class name="cardfile.database.logic.Author" table="AUTHORS">
+        <id name="idAuthor" type="java.lang.Long">
+            <column name="IDAUTHOR" />
+            <generator class="native" />
+        </id>
+        <property name="name" type="java.lang.String">
+            <column name="NAME" />
+        </property>
+        <set name="books" table="AUTHORSBOOKS" inverse="false" lazy="true">
+            <key>
+                <column name="IDAUTHOR" />
+            </key>
+            <many-to-many column="IDBOOK" class="cardfile.database.logic.Book" />
+        </set>
+    </class>
+</hibernate-mapping>
+В каждом поле есть тег
+
+<column name="IDAUTHOR" />
+, указывающий, с какой колонкой в таблице базы данных следует связать это свойство;
+
+Приведу целиком файлы, в которых описываются эти связи:
+
+<hibernate-mapping>
+    <class name="cardfile.database.logic.Reader" table="READERS">
+        <id name="idReader" type="java.lang.Long">
+            <column name="IDREADER" />
+            <generator class="native" />
+        </id>
+        <property name="name" type="java.lang.String">
+            <column name="NAME" />
+        </property>
+        <property name="address" type="java.lang.String">
+            <column name="ADDRESS" />
+        </property>      
+    <set name="using" table="USING" inverse="false" lazy="true">
+         <key column="IDREADER">
+         </key>
+         <one-to-many class="cardfile.database.logic.Using"></one-to-many>
+    </set>
+    </class>
+</hibernate-mapping>
+ 
+ 
+<hibernate-mapping>
+    <class name="cardfile.database.logic.Using" table="USINGS">
+        <id name="id" type="java.lang.Long">
+            <column name="ID" />
+            <generator class="native" />
+        </id>
+        <many-to-one name="idBook" class="cardfile.database.logic.Book">
+            <column name="IDBOOK" />
+        </many-to-one>
+        <many-to-one name="idReader" class="cardfile.database.logic.Reader">
+            <column name="IDREADER" />
+        </many-to-one>
+        <property name="dateGotten" type="java.sql.Date">
+            <column name="DATEGOTTEN" />
+        </property>
+        <property name="dateMustReturn" type="java.sql.Date">
+            <column name="DATEMUSTRETURN" />
+        </property>
+        <property name="complete" type="java.lang.Boolean">
+            <column name="COMPLETE" />
+        </property>
+    </class>
+</hibernate-mapping>
+Еще есть связь one-to-one, но ввиду того, что она почти не используется, я опущу её рассмотрение.
+
+Тут следует заострить внимание на ключе lazy в тегах set. Это так называемая «ленивая загрузка» — загрузка необходимых данных только тогда, когда к ним будет обращение. Когда значение этого параметра равно false, связанные данные будут сразу же извлекаться из таблиц, что очень удобно. Достаточно, например, извлечь одного автора, а вместе с ним мы получим весь набор его книг. Но этой опцией следует пользоваться с осторожностью — только тогда, когда нам действительно необходимо при извлечении записи получать все связанные с ней, иначе мы рискуем получить много ненужных операций и увеличить нагрузку на сервер СУБД генерированием ненужных нам запросов. Когда он равен true, данные будут извлекаться только во время обращения к ним. Но извлекаться они будут только во время, пока открыта hibernate-сессия, во время которой этот объект был извлечён из базы. В большинстве случаев рекомендую ставить true, однако мы рассмотрим пример и с false.
+
+Так же обращаю внимание на то, что при реализации связи многое-ко-многим опция со связью указывает на промежуточную таблицу AUTHORSBOOKS, а не на AUTHORS.
+
+Но не обязательно все это писать руками — все уже сделано за нас. Если вы установили плагин для эклипса, то можно создать эти файлы кодогенератором, щелкнув на пакете с нужными объектами на правую кнопку мыши, выбрав new -> other… и в списке с hibernate выбрав «hibernate mapping file». Отмечаем галочками нужные классы для генерации и смотрим результат.
+
+Однако, увы, результат кодогенератора не целиком соответствует нашим нуждам. Во-первых, ссылка на dtd файл в шапке xml-документа устаревшая, меняем ее на http://www.hibernate.org/dtd/hibernate-mapping-3.0.dtd
+
+Во-вторых, мы используем автоинкрементируемое ключевое поле, а не указываем его сами, поэтому в параметре везде меняем assigned на native.
+
+В-третьих, он не создает связи многое-ко-многим, поэтому правим результат ручками.
+
+Настраиваем
+
+Теперь надо настроить сам hibernate, указать ему, какую базу мы используем, какие файлы карт нужно подключать.
+
+<hibernate-configuration>
+    <session-factory>
+    <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
+    <property name="hibernate.connection.password">pass</property>
+    <property name="connection.url">jdbc:mysql://localhost/CARDFILE</property>
+    <property name="hibernate.connection.username">root</property>
+    <property name="hibernate.dialect">org.hibernate.dialect.MySQLDialect</property>
+    <property name="cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+    <property name="current_session_context_class">thread</property>
+    <property name="connection.characterEncoding">UTF-8</property>
+    <!-- set to true while coding/debugging - it shows all queries -->
+    <!-- <property name="show_sql">true</property>    -->
+    <property name="show_sql">false</property>
+    <property name="generate_statistics">false</property>
+    <property name="use_sql_comments ">false</property>
+    <mapping repre="cardfile/database/logic/Author.hbm.xml" />
+    <mapping repre="cardfile/database/logic/Book.hbm.xml" />
+    <mapping repre="cardfile/database/logic/Reader.hbm.xml" />
+    <mapping repre="cardfile/database/logic/Using.hbm.xml" />
+ 
+    </session-factory>
+</hibernate-configuration>
+Вот получившийся у меня файл настроек, думаю в нем и так все понятно. Сначала идут настройки подключения, затем указываем путь до файлов с картами. Опцию с кодировкой нужно указать, если в проекте используется кириллица, иначе все русские символы дойдут до MySQL как куча вопросительных знаков.
+
+Если установить значение свойства show_sql в true, то он будет выдавать в stdout все сгенерированные им запросы. Чтобы пронаблюдать, как он работает, лучше оставить в true.
+
+Этот файл нужно положить в корневой каталог для всех исходных файлов, в случае проекта в эклипсе — это папка src/. Туда кладем его, называем hibernate.cfg.xml.
+
+Теперь создаем специальный менеджер сессий для работы с хибернейт. Создадим для него отдельный пакет, в нем класс и напишем:
+
+    import java.util.logging.Level;
+    import java.util.logging.Logger;
+ 
+    import org.hibernate.SessionFactory;
+    import org.hibernate.cfg.Configuration;
+ 
+    public class HibernateUtil {
+        private static final SessionFactory sessionFactory = buildSessionFactory();
+ 
+        private static SessionFactory buildSessionFactory() {    
+            /*
+             * Turning off the hibernate logging - now it shows only warnings.
+             */
+            Logger logger = Logger.getLogger("org.hibernate");
+            logger.setLevel(Level.WARNING);
+ 
+            try {
+                return new Configuration().configure().buildSessionFactory();
+            } catch (Throwable ex) {
+                throw new ExceptionInInitializerError(ex);
+            }
+        }
+ 
+        public static SessionFactory getSessionFactory() {
+            return sessionFactory;
+        }
+    }
+При вызове метода getSessionFactory() произойдет инициализация хибернейта, он прочтёт все настройки, свяжет объекты с таблицами в базе данных.
+
+Строчка logger.setLevel(Level.WARNING); указывает, что будет отображаться при подключении хибернейта, что он будет выводить. Пока рекомендую закомментировать её, раскомментировать только после завершения всей работы по подключению hibernate и связыванию с объектами.
+
+Программируем
+
+Итак, определим, какие методы нам могут пригодится для работы с записями в базе. Например:
+
+добавление;
+удаление;
+изменение;
+получение всего списка;
+получение элемента по id;
+и т.д.
+
+Создадим интерфейс, описывающий эти функции. Интерфейс создадим обобщенный:
+
+    public interface ElementDAO<E> {
+        public void addElement(E el); 
+        public void updateElement(E el); 
+        public E getElementByID(Long elId); 
+        public Collection<E> getAllElements(); 
+        public void deleteElement(E el);    
+    }
+Реализуем этот интерфейс.
+
+public class ElementDAOImpl<E> implements ElementDAO<E> {
+    private Class<E> elementClass;
+ 
+    public ElementDAOImpl(Class<E> elementClass){
+        this.elementClass = elementClass;
+    }
+ 
+    @Override
+    public void addElement(E el) {
+        Session session = null;
+ 
+        try {
+            session = HibernateUtil.getSessionFactory().getCurrentSession();
+            Transaction transaction = session.beginTransaction();
+            session.save(el);
+            transaction.commit();
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
+            }
+        }
+    } 
+ 
+    // ...
+}
+Полностью здесь приводить его не буду, заинтересованные могут скачать приложенный исходник и покопаться в нем. Расскажу лишь, что для взаимодействия с БД используются следующие методы класса Session:
+
+session.save(el); — сохранить элемент в БД;
+session.update(el); — обновить элемент;
+session.delete(el); — удалить;
+session.saveOrUpdate(el); — сохранить или обновить;
+el = (E) session.get(elementClass, elId); — получить элемент по id;
+els = session.createCriteria(elementClass).list(); — список всех элементов.
+
+При реализации этого интерфейса я применил некоторую хитрость — обратите внимание на конструктор. Получение класса (объекта типа Class с помощью строки типа E.class) в java невозможно, но взаимодействие с базой в хибернейте происходит именно с помощью классов — в критерии указывается, какой класс нужно получить. Поэтому был создан конструктор, принимающий объект типа Class в качестве параметра. Замечу, что класс ElementDAOImpl не предназначен для прямого использования, а должен наследоваться и явно определять тип элемента. Например:
+
+    public BookDAO extends ElementDAO<Book> {
+        public BookDAO() {
+            super(Book.class);
+        }
+    }
+Таким образом я реализовал и все остальные классы.
+
+Теперь создадим класс-одиночку, предоставляющий возможность непосредственного манипулирования с данными:
+
+    public class DaoFactory {
+        private AuthorDAO authorDAO = new AuthorDAO();
+        private BookDAO bookDAO = new BookDAO();
+        private ReaderDAO readerDAO = new ReaderDAO();
+        private UsingDAO usingDAO = new UsingDAO();
+ 
+        private static DaoFactory instance = null;
+ 
+        public static synchronized DaoFactory getInstance() {
+            if (instance == null) {
+                instance = new DaoFactory();
+            }
+ 
+            return instance;
+        }
+ 
+        // ... тут геттеры ... 
+    }
+Теперь можно работать с базой:
+
+    DaoFactory.getInstance().getReaderDAO().addElement(reader);
+Однако этот набор функций — совсем не то, чего бы нам хотелось. Вернее, то, но только совсем немного. Поэтому предстоит реализовать функции, соответствующие заданной бизнес-логике приложения. Например:
+
+добавить ряд книг из текстового файла;
+дать книгу;
+принять книгу;
+найти все книги, которые когда-либо брал читатель;
+найти все просроченные книги;
+и т.д.
+
+В hibernate существует три способа формирования формирования выборки из базы данных.
+
+С помощью языка запроса HQL;
+С помощью Criteria API;
+С помощью обычного SQL.
+Рассмотрим отдельно каждый из вариантов.
+
+HQL очень похож на обычный SQL, основное отличие в нем, что запрос формируется, как к объекту. Лучше приведу пару примеров:
+
+    FROM Author author WHERE author.id = 10
+в результате даст автора, у которого ключевое поле равно 10.
+
+    SELECT author.id FROM Author author
+выдаст только ключевые поля всех авторов.
+
+Еще интересный пример, в котором в результате выполнения запроса создается объект:
+
+    SELECT NEW Book(book.idBook, book.title)
+            FROM Book book, USING USING
+            WHERE 
+                USING.idReader = :idReader AND 
+                USING.idBook = book.idBook AND 
+                USING.complete = FALSE
+Естественно, у объекта должен быть такой конструктор, иначе hibernate выругается, сказав, что подходящего конструктора не найдено. Эдакая смесь sql и java получается.
+
+Да, забыл сказать, что параметры в запрос подставляются с помощью вызова функции
+
+    query.setLong("idReader", reader.getIdReader());
+Практически, как в обычном JDBC.
+
+И весь результат выполнения запроса сохраняется в лист с помощью функции
+
+    List books = query.list();
+Следующий способ — это Criteria API, т.е. с помощью критериев, сужающих выборку так, как сужает ключевое слово where в sql запросах. Вот простой пример:
+
+    Criteria crit = sess.createCriteria(Book.class);
+    crit.setMaxResults(5);
+    List books = crit.list();
+Сохранит в лист первые 5 книг.
+
+    Criteria crit = session.createCriteria(Reader.class);
+    crit.add(Restrictions.eq("name", name));
+    crit.setMaxResults(1);
+ 
+    List<Reader> readers = crit.list();
+Выдаст одного самого первого читателя по имени.
+
+Вот еще пример из туториала по hibernate, который я так и не применил, но мне он показался интересным.
+
+    Cat cat = new Cat();
+    cat.setSex('F');
+    cat.setColor(Color.BLACK);
+ 
+    List results = session.createCriteria(Cat.class)
+          .add(Example.create(cat))
+          .list();
+Если интерпретировать, то создается объект и по нему, как по шаблону, в базе ищутся подходящие.
+
+И ещё подобный пример:
+
+    Example example = Example.create(cat)
+        .excludeZeroes()           //exclude zero valued properties
+        .excludeProperty("color")  //exclude the property named "color"
+        .ignoreCase()              //perform case insensitive string comparisons
+        .enableLike();             //use like for string comparisons
+ 
+    List results = session.createCriteria(Cat.class)
+        .add(example)
+        .list();
+Очень подробно про это можно прочесть в главе 15 мануала по hibernate (ссылка внизу).
+
+Еще один способ — это традиционный SQL для тех, кто не хочет полагаться на автогенерируемые запросы.
+
+    sess.createSQLQuery("SELECT * FROM BOOKS").list();
+Подробно на этом останавливаться не буду, читайте 16-ю главу мануала.
+
+Теперь мы можем реализовать функции, предусмотренные логикой приложения:
+
+    public class BoundaryDAO {
+ 
+    public void addReader(Reader reader) throws CardFileException {
+        DaoFactory.getInstance().getReaderDAO().addElement(reader);
+    }
+ 
+ 
+    public boolean giveBookTo(Reader reader, Book book) throws CardFileException {
+        // checking if the book is unavailable
+        if (!book.getAvailable()) {
+            return false; 
+        }
+ 
+        boolean added = false;
+ 
+        Session session = null;
+        Transaction transaction = null;
+ 
+        try {
+            session = HibernateUtil.getSessionFactory().getCurrentSession();
+            transaction = session.beginTransaction();
+ 
+            // marking the book unavailable
+            book.setAvailable(false);
+            session.update(book);
+ 
+            Using using = new Using(book, reader);
+            session.save(using);
+ 
+            transaction.commit();
+            added = true;
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
+            }
+        }
+ 
+        return added;    
+ 
+    }
+ 
+    public boolean takeBookBack(Reader reader, Book book) throws CardFileException {
+        // checking if the book is unavailable
+        if (book.getAvailable()) {
+            return false; 
+        }
+ 
+        boolean taken = false;
+ 
+        Session session = null;
+        Transaction transaction = null;
+ 
+        try {
+            session = HibernateUtil.getSessionFactory().getCurrentSession();
+            transaction = session.beginTransaction();
+ 
+            book.setAvailable(true);
+            session.update(book);
+ 
+            Query query = session.createQuery("from Using using " +
+            "where using.idBook = :idBook and using.idReader = :idReader");
+ 
+            query.setLong("idBook", book.getIdBook());
+            query.setLong("idReader", reader.getIdReader());
+ 
+            // getting the query's result
+            List<Using> usings = query.list();
+ 
+            // at least one record is expected
+            if (!usings.isEmpty()) {        
+                for (Using using : usings) {
+                    using.setComplete(true);
+                    session.update(using);
+                }
+ 
+                transaction.commit();
+                taken = true;    
+            }    
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
+            }
+        }
+ 
+        return taken;    
+    }
+ 
+    public Collection<Book> findBooksByReader(Reader reader) throws CardFileException  {
+        List<Book> books = null;
+        Session session = null;
+ 
+        try {
+            session = HibernateUtil.getSessionFactory().getCurrentSession();
+            session.beginTransaction();
+ 
+            // creating a query            
+            Query query = session.createQuery("select new Book(book.idBook, book.title) " +
+                    "from Book book, Using using " +
+                    "where " +
+                        "using.idReader = :idReader and " +
+                        "using.idBook = book.idBook and " +
+                        "using.complete = false");
+ 
+            query.setLong("idReader", reader.getIdReader());
+ 
+ 
+            books = query.list();            
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
+            }
+        }
+ 
+        return books;
+    }
+ 
+    public Book addBook(String title, String pre, Collection<Author> authors) throws CardFileException  {
+        Session session = null;
+        Transaction transaction = null;
+ 
+        Book book = new Book(title, pre);
+ 
+        try {
+            session = HibernateUtil.getSessionFactory().getCurrentSession();
+            transaction = session.beginTransaction();
+ 
+            session.save(book);
+ 
+            boolean exists;        
+            // checking the whole list of authors
+            // if the author is in the list, use him,
+            // otherwise creating a new record
+            for (Author author : authors) {
+                Author currentAuthor = author;
+ 
+                // creating a query
+                Query query = session.createQuery("from Author author " +
+                        "where author.name = :authorName");
+ 
+                query.setString("authorName", currentAuthor.getName());
+                List authorList = query.list();
+ 
+                exists = !authorList.isEmpty();
+ 
+                // if not empty, getting this author, otherwise, using him from
+                // the collection
+                if (exists) {
+                    currentAuthor = (Author)authorList.get(0);
+                }
+ 
+                // adding the book to the author
+                currentAuthor.getBooks().add(book);
+                session.saveOrUpdate(currentAuthor);    
+            }
+ 
+            transaction.commit();
+        } catch (Exception e) {
+            if (transaction != null) {
+                transaction.rollback();
+            }
+        } finally {
+            if (session != null && session.isOpen()) {
+                session.close();
+            }
+        }
+ 
+        return book;
+    }
+ 
+    /// и т.д.        
+ 
+    protected BoundaryDAO() {}
+ 
+    static BoundaryDAO instance = null;
+    static public synchronized BoundaryDAO getInstance() {
+        if (instance == null) {
+            instance = new BoundaryDAO();
+        }
+ 
+        return instance;
+    }
+}
+Остальное смотреть в исходнике.
+
+Вот и все, небольшая информационная система почти готова. Осталось только сделать интерфейс, с помощью которого пользователь программы будет вызывать эти функции.
+
+Исходник. Проект делался в эклипсе, но там же найдутся конфигурационные файлы для его сборки в ant и maven.
+
+Список используемых источников:
+
+hibernate javadocs (смотреть в скачанном архиве с сайта hibernate.org)
+HIBERNATE — Hibernate Query Language — http://www.allapplabs.com/hibernate/hibernate_query_language.htm
+Criteria Queries — http://docs.jboss.org/hibernate/core/3.3/reference/en/html/querycriteria.html
+http://www.java2s.com/pre/Java/Hibernate/Relation-One-to-Many.htm
+
+Для более глубокого ознакомления рекомендую
+HIBERNATE — Relational Persistence for Idiomatic Java:
+http://docs.jboss.org/hibernate/core/3.3/reference/en/html/index.html
+
+и книгу
+
+Jeff Linwoo — Beginning Hibernate, From Novice to Professional (Apress)
+
+Далее:
+
+Далее: Симплекс метод
+Четверг, 14 Апр 2011 в 19:08. Вы можете следить за комментариями к этой статье через RSS 2.0.
+
+
+© Личный сайт Алексея Григорьева 2017
